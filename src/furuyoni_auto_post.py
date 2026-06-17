@@ -15,6 +15,7 @@ from pathlib import Path
 
 APP_NAME = "FuruyoniReplayAutoPost"
 STARTUP_NAME = "Furuyoni Replay Auto Post.lnk"
+TASK_NAME = "Furuyoni Replay Auto Post"
 GAME_DIR_NAME = "Furuyoni Digital Demo"
 FIREBASE_API_KEY = "AIzaSyABKEbvIc5hSJzKrCSjAzFIhns5o_HhSkg"
 FIREBASE_PROJECT_ID = "furuyoni-diary-1918f"
@@ -156,6 +157,57 @@ def uninstall_startup():
         pass
 
 
+def hidden_creationflags():
+    if os.name != "nt":
+        return 0
+    return getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def task_command():
+    return subprocess.list2cmdline(exe_command(watch=True))
+
+
+def run_schtasks(args):
+    if os.name != "nt":
+        return None
+    return subprocess.run(
+        ["schtasks", *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        creationflags=hidden_creationflags(),
+        check=False,
+    )
+
+
+def install_scheduled_task():
+    result = run_schtasks([
+        "/Create",
+        "/TN",
+        TASK_NAME,
+        "/TR",
+        task_command(),
+        "/SC",
+        "MINUTE",
+        "/MO",
+        "5",
+        "/F",
+    ])
+    if result and result.returncode != 0:
+        log_event({"status": "task_error", "action": "create", "error": result.stderr.strip()})
+
+
+def uninstall_scheduled_task():
+    result = run_schtasks(["/Delete", "/TN", TASK_NAME, "/F"])
+    if result and result.returncode not in (0, 1):
+        log_event({"status": "task_error", "action": "delete", "error": result.stderr.strip()})
+
+
+def scheduled_task_installed():
+    result = run_schtasks(["/Query", "/TN", TASK_NAME])
+    return bool(result and result.returncode == 0)
+
+
 def watcher_pid():
     try:
         if PID_FILE.exists():
@@ -187,16 +239,16 @@ def stop_watcher():
 
 
 def enabled():
-    return startup_link_path().exists() or is_process_running(watcher_pid())
+    return startup_link_path().exists() or scheduled_task_installed() or is_process_running(watcher_pid())
 
 
 def start_watcher():
     if is_process_running(watcher_pid()):
         return
     command = exe_command(watch=True)
-    flags = 0
+    flags = hidden_creationflags()
     if os.name == "nt":
-        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+        flags |= getattr(subprocess, "DETACHED_PROCESS", 0)
     subprocess.Popen(command, creationflags=flags, close_fds=True)
 
 
@@ -594,6 +646,9 @@ def watch_loop():
     if not replay_dir:
         log_event({"status": "error", "error": "replay folder not found"})
         return
+    existing_pid = watcher_pid()
+    if existing_pid and existing_pid != os.getpid() and is_process_running(existing_pid):
+        return
     PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
     state = load_json(STATE_FILE, {"posted": {}, "known": [], "auth": None})
     known = set(state.get("known") or [])
@@ -627,6 +682,7 @@ def watch_loop():
 def enable_auto_post():
     replay_dir = ask_replay_dir()
     install_startup()
+    install_scheduled_task()
     start_watcher()
     print("自動投稿を有効化しました。")
     print(f"監視フォルダ: {replay_dir}")
@@ -635,6 +691,7 @@ def enable_auto_post():
 def disable_auto_post():
     stop_watcher()
     uninstall_startup()
+    uninstall_scheduled_task()
     print("自動投稿を無効化しました。")
 
 
@@ -649,6 +706,8 @@ def main():
         return
 
     if enabled():
+        if not is_process_running(watcher_pid()):
+            start_watcher()
         answer = input("自動投稿は有効です。無効化しますか？ (Y/N) ").strip().lower()
         if answer == "y":
             disable_auto_post()

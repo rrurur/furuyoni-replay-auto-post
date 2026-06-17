@@ -14,7 +14,9 @@ if (-not $pyinstaller) {
   throw "PyInstaller not found. Run: python -m pip install -r requirements.txt"
 }
 
-& $pyinstaller.Source `
+$pyinstallerPath = if ($pyinstaller.Source) { $pyinstaller.Source } else { $pyinstaller.FullName }
+
+& $pyinstallerPath `
   --onefile `
   --name furuyoni_auto_post `
   --clean `
