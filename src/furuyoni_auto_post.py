@@ -706,6 +706,9 @@ def main():
         return
 
     if enabled():
+        ask_replay_dir()
+        install_startup()
+        install_scheduled_task()
         if not is_process_running(watcher_pid()):
             start_watcher()
         answer = input("自動投稿は有効です。無効化しますか？ (Y/N) ").strip().lower()
