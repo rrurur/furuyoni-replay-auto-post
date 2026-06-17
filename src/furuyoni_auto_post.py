@@ -163,10 +163,6 @@ def hidden_creationflags():
     return getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
-def task_command():
-    return subprocess.list2cmdline(exe_command(watch=True))
-
-
 def run_schtasks(args):
     if os.name != "nt":
         return None
@@ -180,32 +176,10 @@ def run_schtasks(args):
     )
 
 
-def install_scheduled_task():
-    result = run_schtasks([
-        "/Create",
-        "/TN",
-        TASK_NAME,
-        "/TR",
-        task_command(),
-        "/SC",
-        "MINUTE",
-        "/MO",
-        "5",
-        "/F",
-    ])
-    if result and result.returncode != 0:
-        log_event({"status": "task_error", "action": "create", "error": result.stderr.strip()})
-
-
 def uninstall_scheduled_task():
     result = run_schtasks(["/Delete", "/TN", TASK_NAME, "/F"])
     if result and result.returncode not in (0, 1):
         log_event({"status": "task_error", "action": "delete", "error": result.stderr.strip()})
-
-
-def scheduled_task_installed():
-    result = run_schtasks(["/Query", "/TN", TASK_NAME])
-    return bool(result and result.returncode == 0)
 
 
 def watcher_pid():
@@ -239,7 +213,7 @@ def stop_watcher():
 
 
 def enabled():
-    return startup_link_path().exists() or scheduled_task_installed() or is_process_running(watcher_pid())
+    return startup_link_path().exists() or is_process_running(watcher_pid())
 
 
 def start_watcher():
@@ -682,7 +656,6 @@ def watch_loop():
 def enable_auto_post():
     replay_dir = ask_replay_dir()
     install_startup()
-    install_scheduled_task()
     start_watcher()
     print("自動投稿を有効化しました。")
     print(f"監視フォルダ: {replay_dir}")
@@ -701,6 +674,8 @@ def main():
     if hasattr(sys.stderr, "reconfigure"):
         sys.stderr.reconfigure(encoding="utf-8")
 
+    uninstall_scheduled_task()
+
     if "--watch" in sys.argv:
         watch_loop()
         return
@@ -708,7 +683,6 @@ def main():
     if enabled():
         ask_replay_dir()
         install_startup()
-        install_scheduled_task()
         if not is_process_running(watcher_pid()):
             start_watcher()
         answer = input("自動投稿は有効です。無効化しますか？ (Y/N) ").strip().lower()
