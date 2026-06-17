@@ -223,7 +223,9 @@ def start_watcher():
     flags = hidden_creationflags()
     if os.name == "nt":
         flags |= getattr(subprocess, "DETACHED_PROCESS", 0)
-    subprocess.Popen(command, creationflags=flags, close_fds=True)
+    env = os.environ.copy()
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    subprocess.Popen(command, creationflags=flags, close_fds=True, env=env)
 
 
 def steam_roots():
