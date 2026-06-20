@@ -176,6 +176,23 @@ def run_schtasks(args):
     )
 
 
+def stop_other_auto_post_processes():
+    if os.name != "nt":
+        return
+    script = (
+        "Get-Process -Name 'furuyoni_auto_post' -ErrorAction SilentlyContinue "
+        f"| Where-Object {{ $_.Id -ne {os.getpid()} }} "
+        "| Stop-Process -Force"
+    )
+    subprocess.run(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=hidden_creationflags(),
+        check=False,
+    )
+
+
 def uninstall_scheduled_task():
     result = run_schtasks(["/Delete", "/TN", TASK_NAME, "/F"])
     if result and result.returncode not in (0, 1):
@@ -658,6 +675,8 @@ def watch_loop():
 def enable_auto_post():
     replay_dir = ask_replay_dir()
     install_startup()
+    stop_other_auto_post_processes()
+    PID_FILE.unlink(missing_ok=True)
     start_watcher()
     print("自動投稿を有効化しました。")
     print(f"監視フォルダ: {replay_dir}")
@@ -685,6 +704,8 @@ def main():
     if enabled():
         ask_replay_dir()
         install_startup()
+        stop_other_auto_post_processes()
+        PID_FILE.unlink(missing_ok=True)
         if not is_process_running(watcher_pid()):
             start_watcher()
         answer = input("自動投稿は有効です。無効化しますか？ (Y/N) ").strip().lower()
