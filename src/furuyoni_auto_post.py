@@ -589,7 +589,7 @@ def post_to_firestore(record, state):
     token = auth["idToken"]
     now = dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
     public_record = {key: value for key, value in record.items() if key != "_local"}
-    public_record.update({"ownerUid": uid, "createdAt": now, "updatedAt": now})
+    public_record.update({"ownerUid": uid, "ownerHandle": record["_local"]["displayHandle"], "createdAt": now, "updatedAt": now})
 
     fields = {}
     for key, value in public_record.items():
