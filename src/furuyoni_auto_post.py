@@ -420,12 +420,27 @@ def result_type_id(data):
     return 2
 
 
+LEGACY_TO_CURRENT_CARD_PATH = {
+    "na_04_tokoyo_o_n_2": "na_04_tokoyo_o_n_3",
+    "na_04_tokoyo_o_n_3": "na_04_tokoyo_o_n_2",
+    "na_04_tokoyo_a2_n_2": "na_04_tokoyo_a2_n_3",
+    "na_05_oboro_o_n_3": "na_05_oboro_o_n_4",
+    "na_05_oboro_o_n_4": "na_05_oboro_o_n_5",
+    "na_05_oboro_o_n_5": "na_05_oboro_o_n_6",
+    "na_05_oboro_o_n_6": "na_05_oboro_o_n_3",
+    "na_05_oboro_a1_n_3": "na_05_oboro_a1_n_4",
+    "na_08_hagane_a1_n_2": "na_08_hagane_a1_n_7",
+}
+
+
 def card_code_to_path(code):
     if not code:
         return ""
-    code = str(code)
+    code = str(code).strip().lower().replace("-", "_")
     if code.startswith("re_"):
-        code = "na_" + code[3:]
+        return f"images/na_{code[3:]}.png"
+    base = re.sub(r"_s\d+(?:_\d+)?$", "", code, flags=re.IGNORECASE)
+    code = LEGACY_TO_CURRENT_CARD_PATH.get(base, code)
     return f"images/{code}.png"
 
 
